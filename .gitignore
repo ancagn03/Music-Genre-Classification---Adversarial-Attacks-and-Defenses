@@ -1,2 +1,6 @@
 gtzan-music-genre-dataset.zip
-gtzan-music-genre-dataset
+data/gtzan-music-genre-dataset
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+results/
