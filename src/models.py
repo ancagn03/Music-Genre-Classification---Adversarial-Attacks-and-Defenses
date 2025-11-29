@@ -1,13 +1,33 @@
 """
-Model definitions.
-Includes MLP for feature-based classification and CNN for spectrograms.
+Deep Learning Models for Music Genre Classification.
+
+This module defines the neural network architectures used in the project:
+1. MusicMLP: A Multi-Layer Perceptron for feature-based classification (MFCCs).
+2. MusicCNN: A custom Convolutional Neural Network for spectrogram-based classification.
+3. MusicResNet18: A transfer learning model based on ResNet-18 adapted for single-channel audio spectrograms.
 """
+
 import torch.nn as nn
 import torch.nn.functional as F
 import torchvision.models as models
 
 class MusicMLP(nn.Module):
+    """
+    Multi-Layer Perceptron (MLP) for music genre classification using extracted audio features.
+    
+    Architecture:
+        - Input Layer: Accepts a vector of features (default dim=44, e.g., MFCC statistics).
+        - Hidden Layer 1: Linear -> BatchNorm -> ReLU -> Dropout.
+        - Hidden Layer 2: Linear -> BatchNorm -> ReLU -> Dropout.
+        - Output Layer: Linear layer mapping to class logits.
+    """
     def __init__(self, input_dim=44, num_classes=10, hidden_dim=256):
+        """
+        Args:
+            input_dim (int): Dimensionality of the input feature vector.
+            num_classes (int): Number of target classes (genres).
+            hidden_dim (int): Number of neurons in the first hidden layer.
+        """
         super(MusicMLP, self).__init__()
         # Layer 1
         self.layer1 = nn.Linear(input_dim, hidden_dim)
@@ -23,6 +43,15 @@ class MusicMLP(nn.Module):
         self.layer3 = nn.Linear(hidden_dim // 2, num_classes)
         
     def forward(self, x):
+        """
+        Forward pass of the MLP.
+        
+        Args:
+            x (torch.Tensor): Input tensor of shape (batch_size, input_dim).
+            
+        Returns:
+            torch.Tensor: Output logits of shape (batch_size, num_classes).
+        """
         x = self.layer1(x)
         x = self.bn1(x)
         x = F.relu(x)
@@ -37,7 +66,21 @@ class MusicMLP(nn.Module):
         return x
 
 class MusicCNN(nn.Module):
+    """
+    Custom Convolutional Neural Network (CNN) for audio spectrogram classification.
+    
+    Architecture:
+        - 4 Convolutional Blocks: (Conv2d -> BatchNorm -> ReLU -> MaxPool).
+        - Flattening.
+        - Fully Connected Layers with Dropout.
+        
+    Designed to process Mel-spectrograms as 1-channel images (128x128).
+    """
     def __init__(self, num_classes=10):
+        """
+        Args:
+            num_classes (int): Number of target classes (genres).
+        """
         super(MusicCNN, self).__init__()
         # Input shape: (Batch, 1, 128, 128)
         # 1 channel (grayscale spectrogram), 128 mel bands, 128 time steps
@@ -65,6 +108,15 @@ class MusicCNN(nn.Module):
         self.fc2 = nn.Linear(512, num_classes)
 
     def forward(self, x):
+        """
+        Forward pass of the CNN.
+        
+        Args:
+            x (torch.Tensor): Input tensor of shape (batch_size, 1, 128, 128).
+            
+        Returns:
+            torch.Tensor: Output logits of shape (batch_size, num_classes).
+        """
         # x: (batch, 1, 128, 128)
         x = self.pool(F.relu(self.bn1(self.conv1(x))))
         x = self.pool(F.relu(self.bn2(self.conv2(x))))
@@ -78,7 +130,18 @@ class MusicCNN(nn.Module):
         return x
 
 class MusicResNet18(nn.Module):
+    """
+    ResNet-18 model adapted for single-channel audio spectrograms.
+    
+    Uses a pre-trained ResNet-18 backbone (ImageNet weights) with:
+    1. Modified first convolutional layer to accept 1 input channel (instead of 3 RGB).
+    2. Modified final fully connected layer to output `num_classes` logits.
+    """
     def __init__(self, num_classes=10):
+        """
+        Args:
+            num_classes (int): Number of target classes (genres).
+        """
         super(MusicResNet18, self).__init__()
         # Load pre-trained ResNet18
         self.resnet = models.resnet18(weights=models.ResNet18_Weights.DEFAULT)
@@ -93,4 +156,13 @@ class MusicResNet18(nn.Module):
         self.resnet.fc = nn.Linear(num_ftrs, num_classes)
         
     def forward(self, x):
+        """
+        Forward pass of the ResNet-18.
+        
+        Args:
+            x (torch.Tensor): Input tensor of shape (batch_size, 1, 128, 128).
+            
+        Returns:
+            torch.Tensor: Output logits of shape (batch_size, num_classes).
+        """
         return self.resnet(x)

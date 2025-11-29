@@ -1,0 +1,401 @@
+\documentclass{if-beamer}
+\usepackage[export]{adjustbox}
+\usepackage[justification=centering]{caption}
+\usepackage{amsmath,amssymb,amsfonts, bm}
+\usepackage{multirow}
+\usepackage{booktabs} % For better table rules (toprule, midrule, bottomrule)
+\usepackage{graphicx} % Ensure graphicx is loaded
+
+\newcommand{\GoodA}[1]{\textcolor[rgb]{0.1, 0.5, 0.1}{\textbf{#1}}} % Dark Green (Highest Acc)
+\newcommand{\GoodB}[1]{\textcolor[rgb]{0.3, 0.7, 0.3}{#1}} % Lighter Green (Mid Acc)
+
+% Orange/Yellow Shades for Poor Robustness (Alert)
+\newcommand{\AlertA}[1]{\textcolor{orange}{#1}} % Orange (Moderate Drop)
+\newcommand{\AlertB}[1]{\textcolor{red!70!black}{\textbf{#1}}} % Dark Red/Brown (Severe Drop, for visibility against white)
+\newcommand{\AlertC}[1]{\textcolor{red}{#1}} % Pure Red (Catastrophic Drop, e.g., 0.0%)
+
+\newcommand{\Neutral}[1]{#1} % Standard black text
+
+% \usepackage{subfig} % subfig is generally not recommended with Beamer, use subfigure or minipages
+\setbeamertemplate{caption}[numbered]
+\graphicspath{{images/}} % Define image path
+
+% --------------------------------------------------- %
+%                           Presentation info                         %
+% --------------------------------------------------- %
+\title[Artificial Intelligence III]{Adversarial Attacks and Defenses \\ \small Music Genre Classification} % Added \small for subtitle
+\author[Carp, Găină]{\textbf{Students}:\newline Bogdan George Carp \\ Anca-Maria Găină \newline \newline \textbf{Coordinators}:\\  Ș. L. Dr. Ing. Ana-Antonia Neacșu \\ As. Drd. Ing. Vlad Vasilescu } % Corrected titles assuming common academic titles
+\institute[ETTI]{ % Shortened institute for footer
+National University of Science and Technology POLITEHNICA Bucharest\\
+  Faculty of Electronics, Telecommunications and Information Technology \\
+%   Tehnologii Multimedia în Aplicaţii de Biometrie şi Securitatea Informaţiei\\ % Optional: Can be removed for brevity on title slide
+}
+\date{December 2025} % Changed to current month/year, adjust if needed
+\logo{
+% \includegraphics[scale=0.2]{biosinf.png} % Assuming biosinf.png is relevant, if not, use Poli/ETTI logos from report
+% \includegraphics[height=1cm]{Poli.jpg} \hspace{1cm} % Example from your report's title page
+ \includegraphics[height=0.6cm]{images/biosinf.png}   % Example from your report's title page
+}
+\subject{Artificial Intelligence III} % metadata
+
+% --------------------------------------------------- %
+%                           Title + Schedule                          %
+% --------------------------------------------------- %
+
+\begin{document}
+ \setbeamertemplate{footline}[frame number] % Add frame numbers for easier navigation
+
+% --- Title Page ---
+\begin{frame}
+    \titlepage
+\end{frame}
+
+% CUPRINS
+\begin{frame}{Table of Contents}
+\tableofcontents
+\end{frame}
+
+% INTRODUCERE
+\section{Introduction}
+
+\begin{frame}{Methodology: Audio Classification}
+
+    % Top Section: Data & Approach
+    % Using an alertblock to highlight the core approach
+    \begin{block}{Data Approach}
+        \small
+        \textbf{Dataset:} GTZAN (1000 songs, 10 genres) converted to \textbf{Mel-Spectrograms}.\\
+        \textbf{Concept:} Audio classification treated as an image recognition task (128$\times$128 grayscale).
+    \end{block}
+
+    \vspace{0.2cm}
+
+    % Main Content split into two columns for better readability
+    \begin{columns}[t] % 't' aligns columns at the top
+
+        % --- LEFT COLUMN: MODELS ---
+        \begin{column}{0.5\textwidth}
+            \textbf{Model 1: Custom CNN (Baseline)}
+            \begin{itemize}
+                \item \footnotesize \textbf{Arch:} 4-Block trained from scratch: \\
+                (Conv2D $\to$ BN $\to$ ReLU $\to$ MaxPool).
+                \item \textbf{Complexity:} Filters $32 \to 256$, feeding a 512-unit dense layer.
+            \end{itemize}
+
+            \vspace{0.2cm}
+
+            \textbf{Model 2: ResNet18 (Transfer)}
+            \begin{itemize}
+                \item \footnotesize \textbf{Arch:} Standard ResNet18 (ImageNet).
+                \item \textbf{Adaptation:} Modified 1st layer (1-channel) \& final layer (10 classes).
+                \item \textbf{Role:} SOTA architecture utilizing residual connections.
+            \end{itemize}
+        \end{column}
+
+        % --- RIGHT COLUMN: TRAINING ---
+        \begin{column}{0.45\textwidth}
+                \textbf{Training Strategy}
+                \small
+                \begin{itemize}
+                    \item \textbf{Optimization:}\\
+                    Adam ($\text{LR}=0.001$) with Weight Decay ($1\text{e}^{-4}$).
+                    
+                    \item \textbf{Scheduler:}\\
+                    ReduceLROnPlateau (Factor=0.5, Patience=5).
+                    
+                    \item \textbf{Lifecycle:}\\
+                    Max 100 Epochs.\\
+                    Early Stopping (Patience=20).
+                \end{itemize}
+        \end{column}
+
+    \end{columns}
+
+\end{frame}
+
+\begin{frame}{Baseline}
+\begin{table}[htbp]
+    \centering
+    \label{tab:model_comparison}
+    \vspace{0.3cm} % Add a little space between caption and table
+    \begin{tabular}{lccc}
+        \toprule
+        \textbf{Model} & \textbf{Clean Accuracy} & \textbf{Training Strategy} & \textbf{Total Training Time} \\
+        \midrule
+        CNN & 83.75\% & 100 Epochs (Early Stop $\sim$45) & $\sim$11 mins \\
+        ResNet18 & 84.14\% & 100 Epochs (Early Stop $\sim$40) & $\sim$13 mins \\
+        \bottomrule
+    \end{tabular}
+     \caption{Comparison of Model Performance and Training Time}
+\end{table}
+
+\end{frame}
+
+
+
+
+\section{Attacks}
+
+
+
+\begin{frame}{Fast Gradient Sign Method (FGSM)}
+\begin{itemize}
+    \item \textbf{Method}: "White Box" attack that uses the model's own gradients.
+    \item \textbf{Goal}: To force the music classifier to make a mistake without destroying the audio quality.
+    \item \textbf{Calculate Gradient}: Determine which pixels in the Mel Spectrogram contribute most to the correct prediction.
+    \item \textbf{Determine Direction}: Find the mathematical direction that increases the error (Loss) the fastest.
+    \item \textbf{Add Noise}: Apply a tiny, invisible layer of noise ($\epsilon$) in that exact direction.
+    \item \textbf{Result}: The audio sounds the same to the human ear, but the model crosses the decision boundary and misclassifies the genre.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Minimum-Norm Attack}
+    \begin{itemize}
+        \item \textbf{Method}: Unlike FGSM (which takes one fixed step), this is an iterative optimization process.
+        \item \textbf{Goal}: To fool the genre classifier using the absolute smallest amount of noise possible, making the attack much harder to detect than FGSM.
+        \item \textbf{Locate Boundary}: The algorithm analyzes the model to find the closest "decision boundary".
+        \item \textbf{Shortest Path}: It calculates the shortest perpendicular vector needed to push the spectrogram just barely over that line.
+        \item \textbf{Iterate}: It repeatedly adjusts the input, inching closer to the boundary until the prediction flips with minimal change.
+        \item \textbf{Result}: The adversarial noise is mathematically optimized to be as quiet as possible—often completely invisible on a spectrogram and inaudible in the waveform.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Results after attack}
+\begin{table}[htbp]
+    \centering
+
+    \label{tab:epsilon_comparison}
+    \vspace{0.3cm}
+    \begin{tabular}{lcccc}
+        \toprule
+        \textbf{Epsilon ($\epsilon$)} & \textbf{CNN (FGSM)} & \textbf{CNN (PGD)} & \textbf{ResNet18 (FGSM)} & \textbf{ResNet18 (PGD)} \\
+        \midrule
+        0.000 & 81.6\% & 81.6\% & 78.4\% & 78.4\% \\
+        0.001 & 79.2\% & 79.3\% & 76.5\% & 76.4\% \\
+        0.005 & 66.2\% & 64.5\% & 66.2\% & 66.0\% \\
+        0.010 & 52.3\% & 48.8\% & 55.3\% & 53.3\% \\
+        0.050 & 17.3\% & 2.1\%  & 6.9\%  & 0.5\% \\
+        0.100 & 9.2\%  & 0.0\%  & 0.5\%  & 0.0\% \\
+        \bottomrule
+    \end{tabular}
+        \caption{Model Robustness under FGSM and PGD Attacks with Varying Epsilon ($\epsilon$)}
+\end{table}
+\end{frame}
+
+
+\section{Defenses}
+\begin{frame}{Adversarial Training}
+\begin{itemize}
+    \item \textbf{Method}: Instead of training only on clean GTZAN songs, we train on a mix of clean and attacked data.
+    \item \textbf{Goal}: To induce model invariance against gradient-based (FGSM) and optimization-based attacks, effectively hardening the classifier.
+    \item \textbf{Dynamic Generation}: Synthesizes adversarial examples on-the-fly via an "inner maximization" step within the training loop.
+    \item \textbf{Label Consistency}: Mapping the distorted inputs to their original class labels, compelling the model to maintain correct classification despite significant feature space distortion.
+    \item \textbf{Feature Regularization}: Prioritizes structurally invariant features (e.g., rhythm, timbre) over non-robust high-frequency spectral artifacts.
+    \item \textbf{Result}: The model learns to recognize the genre even when the attacker tries to confuse it, creating much smoother decision boundaries.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Feature Squeezing} 
+\begin{itemize}
+    \item \textbf{Goal}: To detect adversarial inputs by exploiting the fragility of perturbations to signal processing compared to robust natural data.
+    \item \textbf{Input Transformation}: Applies non-differentiable transformations to the spectrogram that destroy minute adversarial noise patterns without altering the coarse semantic audio content.
+    \item \textbf{Discrepancy Analysis}: Compares prediction vectors between original and "squeezed" inputs to quantify model divergence.
+    \item \textbf{Artifact Suppression}: Filters non-robust high-frequency perturbations, forcing adversaries to employ perceptually distinct distortions
+    \item \textbf{Result}: Enables the rejection of adversarial samples when the prediction difference exceeds a calibrated threshold, effectively validating input integrity.
+\end{itemize}
+\end{frame}
+
+
+\begin{frame}{Results after defense}
+\begin{table}[htbp]
+    \centering
+
+    \label{tab:defense_strategies}
+    \vspace{0.3cm}
+    % Resizebox ensures the table fits exactly to the text width
+    \resizebox{\textwidth}{!}{%
+    \begin{tabular}{lllccl}
+        \toprule
+        \textbf{Model} & \textbf{Strategy} & \textbf{Training Method} & \textbf{Inference Defense} & \textbf{Clean Acc} & \textbf{Net Diff} \\
+        \midrule
+        CNN & Baseline & Standard & None & 81.6\% & --- \\
+        CNN & Adv. Mixed & 50\% Clean / 50\% Adv & None & 77.4\% & -4.2\% \\
+        CNN & Adv. Pure & 100\% Adv & None & 75.8\% & -5.8\% \\
+        CNN & Squeezing (Mixed) & 50/50 + 5-bit Quant. & 5-bit Squeezing & 70.9\% & -10.7\% \\
+        CNN & Squeezing (Pure) & 100\% Adv + 5-bit Quant. & 5-bit Squeezing & 70.8\% & -10.8\% \\
+        \midrule
+        ResNet18 & Baseline & Standard & None & 78.4\% & --- \\
+        ResNet18 & Adv. Mixed & 50\% Clean / 50\% Adv & None & 73.3\% & -5.1\% \\
+        ResNet18 & Adv. Pure & 100\% Adv & None & 74.1\% & -4.3\% \\
+        ResNet18 & Squeezing (Mixed) & 50/50 + 5-bit Quant. & 5-bit Squeezing & 74.1\% & -4.3\% \\
+        ResNet18 & Squeezing (Pure) & 100\% Adv + 5-bit Quant. & 5-bit Squeezing & --- & --- \\
+        \bottomrule
+    \end{tabular}%
+    }
+        \caption{Impact of Defense Strategies on Clean Accuracy and Performance Drop}
+\end{table}
+ 
+\end{frame}
+
+\section{Results}
+
+\begin{frame}{Detailed Robustness Analysis (FGSM vs PGD)}
+
+    % \begin{table}[htbp]
+    %     \centering
+    %     \tiny 
+    %     \setlength{\tabcolsep}{1.5pt} % Minimal space between columns
+    %     \renewcommand{\arraystretch}{1.0} % Reduced vertical breathing room
+        
+    %     \resizebox{\textwidth}{!}{%
+    %         \begin{tabular}{l c cc cc cc}
+    %             \toprule
+    %             & \textbf{Clean} & \multicolumn{2}{c}{$\boldsymbol{\epsilon=0.01}$} & \multicolumn{2}{c}{$\boldsymbol{\epsilon=0.03}$} & \multicolumn{2}{c}{$\boldsymbol{\epsilon=0.1}$} \\
+    %             \cmidrule(lr){3-4} \cmidrule(lr){5-6} \cmidrule(lr){7-8}
+    %             \textbf{Strategy} & \textbf{Acc} & \textbf{FGSM} & \textbf{PGD} & \textbf{FGSM} & \textbf{PGD} & \textbf{FGSM} & \textbf{PGD} \\
+    %             \midrule
+                
+    %             % --- CNN SECTION ---
+    %             \multicolumn{8}{l}{\textbf{\textit{Model: CNN}}} \\ 
+    %             Baseline & 81.6\% & \AlertA{52.3\%} & \AlertA{48.8\%} & \AlertB{26.2\%} & \AlertB{8.5\%} & \AlertB{9.2\%} & \AlertC{0.0\%} \\
+                
+    %             Adv. Mixed & 77.4\% & \GoodA{68.4\%} & \GoodA{67.8\%} & \AlertA{52.9\%} & \AlertA{48.6\%} & \AlertB{11.7\%} & \AlertB{2.3\%} \\
+    %             Adv. Pure & 75.8\% & \GoodA{67.2\%} & \GoodA{67.0\%} & \AlertA{51.0\%} & \AlertA{47.7\%} & \AlertB{15.8\%} & \AlertB{6.4\%} \\
+                
+    %             Squeezing (Mix) & 70.9\% & \GoodB{60.9\%} & \GoodB{60.8\%} & \AlertA{46.6\%} & \AlertA{44.3\%} & \AlertB{14.5\%} & \AlertB{4.8\%} \\
+    %             Squeezing (Pure) & 70.8\% & \GoodB{62.7\%} & \GoodB{62.6\%} & \AlertA{48.3\%} & \AlertA{45.3\%} & \AlertB{14.9\%} & \AlertB{6.2\%} \\
+    %             \midrule
+                
+    %             % --- RESNET SECTION ---
+    %             \multicolumn{8}{l}{\textbf{\textit{Model: ResNet18}}} \\ 
+    %             Baseline & 78.4\% & \AlertA{55.3\%} & \AlertA{53.1\%} & \AlertB{21.9\%} & \AlertB{9.3\%} & \AlertC{0.5\%} & \AlertC{0.0\%} \\
+                
+    %             Adv. Mixed & 73.3\% & \GoodA{64.2\%} & \GoodA{64.2\%} & \AlertA{44.1\%} & \AlertA{40.7\%} & \AlertB{7.3\%} & \AlertC{0.5\%} \\
+    %             Adv. Pure & 74.1\% & \GoodA{66.2\%} & \GoodA{66.2\%} & \AlertA{49.1\%} & \AlertA{47.3\%} & \AlertB{10.3\%} & \AlertB{2.9\%} \\
+                
+    %             Squeezing (Mix) & 74.1\% & \GoodA{64.1\%} & \GoodA{63.8\%} & \AlertA{42.4\%} & \AlertA{39.4\%} & \AlertB{9.1\%} & \AlertB{1.4\%} \\
+    %             Squeezing (Pure) & 74.1\% & \GoodA{64.1\%} & \GoodA{63.1\%} & \AlertA{45.6\%} & \AlertA{42.7\%} & \AlertB{10.2\%} & \AlertB{3.0\%} \\
+    %             \bottomrule
+    %         \end{tabular}%
+    %     }
+    %     \caption{Comparison of accuracy under FGSM and PGD attacks at varying perturbation strengths ($\epsilon$).}
+    % \end{table}
+
+\begin{table}[htbp]
+        \centering
+        \tiny 
+        \setlength{\tabcolsep}{1.5pt} % Minimal space between columns
+        \renewcommand{\arraystretch}{1.0} % Reduced vertical breathing room
+        
+        \resizebox{\textwidth}{!}{%
+            \begin{tabular}{l c cc cc cc}
+                \toprule
+                & \textbf{Clean} & \multicolumn{2}{c}{$\boldsymbol{\epsilon=0.01}$} & \multicolumn{2}{c}{$\boldsymbol{\epsilon=0.03}$} & \multicolumn{2}{c}{$\boldsymbol{\epsilon=0.1}$} \\
+                \cmidrule(lr){3-4} \cmidrule(lr){5-6} \cmidrule(lr){7-8}
+                \textbf{Strategy} & \textbf{Acc} & \textbf{FGSM} & \textbf{PGD} & \textbf{FGSM} & \textbf{PGD} & \textbf{FGSM} & \textbf{PGD} \\
+                \midrule
+                
+                % --- CNN SECTION ---
+                \multicolumn{8}{l}{\textbf{\textit{Model: CNN}}} \\ 
+                Baseline & 81.6\% & \AlertA{52.3\%} & \AlertA{48.8\%} & \AlertB{26.2\%} & \AlertB{8.5\%} & \AlertB{9.2\%} & \AlertC{0.0\%} \\
+                
+                Adv. Mixed & 77.4\% & \GoodA{68.4\%} & \GoodA{67.8\%} & \AlertA{52.9\%} & \AlertA{48.6\%} & \AlertB{11.7\%} & \AlertB{2.3\%} \\
+                Adv. Pure & 75.8\% & \GoodA{67.2\%} & \GoodA{67.0\%} & \AlertA{51.0\%} & \AlertA{47.7\%} & \AlertB{15.8\%} & \AlertB{6.4\%} \\
+                
+                Squeezing (Mix) & 70.9\% & \GoodB{60.9\%} & \GoodB{60.8\%} & \AlertA{46.6\%} & \AlertA{44.3\%} & \AlertB{14.5\%} & \AlertB{4.8\%} \\
+                Squeezing (Pure) & 70.8\% & \GoodB{62.7\%} & \GoodB{62.6\%} & \AlertA{48.3\%} & \AlertA{45.3\%} & \AlertB{14.9\%} & \AlertB{6.2\%} \\
+                \midrule
+                
+                % --- RESNET SECTION ---
+                \multicolumn{8}{l}{\textbf{\textit{Model: ResNet18}}} \\ 
+                Baseline & 78.4\% & \AlertA{55.3\%} & \AlertA{53.1\%} & \AlertB{21.9\%} & \AlertB{9.3\%} & \AlertC{0.5\%} & \AlertC{0.0\%} \\
+                
+                Adv. Mixed & 73.3\% & \GoodA{64.2\%} & \GoodA{64.2\%} & \AlertA{44.1\%} & \AlertA{40.7\%} & \AlertB{7.3\%} & \AlertC{0.5\%} \\
+                Adv. Pure & 74.1\% & \GoodA{66.2\%} & \GoodA{66.2\%} & \AlertA{49.1\%} & \AlertA{47.3\%} & \AlertB{10.3\%} & \AlertB{2.9\%} \\
+                
+                Squeezing (Mix) & 74.1\% & \GoodA{64.1\%} & \GoodA{63.8\%} & \AlertA{42.4\%} & \AlertA{39.4\%} & \AlertB{9.1\%} & \AlertB{1.4\%} \\
+                Squeezing (Pure) & 74.1\% & \GoodA{64.1\%} & \GoodA{63.1\%} & \AlertA{45.6\%} & \AlertA{42.7\%} & \AlertB{10.2\%} & \AlertB{3.0\%} \\
+                \bottomrule
+            \end{tabular}%
+        }
+        \caption{Comparison of accuracy under FGSM and PGD attacks at varying perturbation strengths ($\epsilon$).}
+        \label{tab:defense_strategies}
+    \end{table}
+    
+\end{frame}
+
+\begin{frame}{}
+\begin{table}[htbp]
+    \centering
+
+    \label{tab:defense_improvement}
+    \vspace{0.3cm}
+    % Use resizebox to ensure the table fits within text width
+    \resizebox{\textwidth}{!}{%
+    \begin{tabular}{lcccc}
+        \toprule
+        \textbf{Model} & \textbf{Baseline (Undefended)} & \textbf{Defended (Adv. Mixed)} & \textbf{Defended (Adv. Pure)} & \textbf{Improvement (Mixed)} \\
+        \midrule
+        CNN & 0.55 & 20.32 & 34.43 & 37x \\
+        ResNet18 & 0.55 & 4.85 & 6.36 & 9x \\
+        \bottomrule
+    \end{tabular}%
+    }
+        \caption{Defense Improvement Summary}
+\end{table}
+\end{frame}
+
+
+\begin{frame}{Best performing Defence}
+\begin{table}[htbp]
+    \centering
+
+    \label{tab:defense_improvement}
+    \vspace{0.3cm}
+    \footnotesize % Use smaller font if needed to fit columns
+    \begin{tabular}{llcccc}
+        \toprule
+        \textbf{Model} & \textbf{Best Defense Strategy} & \textbf{Epsilon ($\epsilon$)} & \textbf{Baseline Acc} & \textbf{Defended Acc} & \textbf{Improvement} \\
+        \midrule
+        CNN & Adv. Training (Mixed) & 0.01 & 48.8\% & 67.8\% & +19.0\% \\
+        CNN & Adv. Training (Mixed) & 0.03 & 8.5\% & 48.6\% & +40.1\% \\
+        ResNet18 & Adv. Training (Pure) & 0.01 & 53.1\% & 66.2\% & +13.1\% \\
+        ResNet18 & Adv. Training (Pure) & 0.03 & 9.3\% & 47.3\% & +38.0\% \\
+        \bottomrule
+    \end{tabular}
+        \caption{Summary of Improvements with Best Defense Strategies}
+\end{table}
+\end{frame}
+
+
+
+% CONCLUZII ȘI BIBLIOGRAFIE
+\section{Conclusions}
+
+\begin{frame}{Conclusions}
+
+\end{frame}
+
+
+
+
+% \begin{frame}{Bibliografie extinsă}
+% \begin{itemize}
+%     \item AI and Visual Art: A Concise Review and Perspectives of Senior Thai Artists on Its Impacts
+%     \item Art in the Era of Algorithms: Is Generative AI a Friend or Foe for 2D Artists?
+%     \item The Intersection of Art and AI: Innovations in Creative Collaboration
+%     \item Application of Generative Artificial Intelligence in Art Design
+%     \item Exploring Human Perception of AI-Generated Artworks
+% \end{itemize}
+
+% \end{frame}
+
+\begin{frame}[allowframebreaks]
+\frametitle{Bibliography}
+% \setbeamertemplate{Bibliografie}{}
+\nocite{*}
+\bibliographystyle{unsrt}
+\bibliography{referinte}
+\end{frame}
+
+\end{document}
